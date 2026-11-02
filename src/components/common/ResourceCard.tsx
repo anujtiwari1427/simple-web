@@ -51,16 +51,8 @@ export function ResourceCard({
     );
   };
 
-  // Check if item is under 14 days old for "New" badge (Section 6 requirement)
-  const isNewItem = (() => {
-    if (resource.isNew) return true;
-    if (resource.publishedAt) {
-      const pubDate = new Date(resource.publishedAt);
-      const diffDays = (Date.now() - pubDate.getTime()) / (1000 * 60 * 60 * 24);
-      return diffDays <= 14;
-    }
-    return false;
-  })();
+  // Check if item has "New" badge (Section 6 requirement)
+  const isNewItem = Boolean(resource.isNew);
 
   const actionLabel = (() => {
     if (resource.type.toLowerCase() === "pdf") return "Download PDF";

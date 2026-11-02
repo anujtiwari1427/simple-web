@@ -142,7 +142,7 @@ export function BlogReaderClient({ post, relatedPosts }: BlogReaderProps) {
             <div className="flex items-center gap-4 text-xs font-display text-[var(--muted)] pb-6 mb-8 border-b border-[var(--border)]">
               <span className="flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
-                <span>{post.readTimeMinutes} min read</span>
+                <span>{post.readingTimeMinutes} min read</span>
               </span>
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-[var(--accent)]" />

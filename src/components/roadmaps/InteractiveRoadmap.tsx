@@ -94,11 +94,11 @@ export function InteractiveRoadmap({ roadmap }: InteractiveRoadmapProps) {
         <div className="rounded-[12px] bg-[var(--surface)] border border-[var(--border)] p-6 sm:p-8 mb-10 text-left">
           <div className="flex items-center justify-between gap-3 mb-3">
             <span className="text-xs font-display text-[var(--accent)] font-medium">
-              {roadmap.category || "Interactive Roadmap"}
+              {roadmap.badge || "Interactive Roadmap"}
             </span>
             <div className="flex items-center gap-1.5 text-xs text-[var(--muted)] font-display">
               <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
-              <span>{roadmap.estimatedTime || roadmap.duration}</span>
+              <span>{roadmap.duration}</span>
             </div>
           </div>
 
@@ -185,9 +185,9 @@ export function InteractiveRoadmap({ roadmap }: InteractiveRoadmapProps) {
                         <span className="text-xs font-mono text-[var(--muted)]">
                           Phase {phaseNumber}: {phaseTitle}
                         </span>
-                        {step.estimatedHours && (
+                        {step.estimatedTime && (
                           <span className="text-xs text-[var(--muted)] flex items-center gap-1 font-display">
-                            • <Clock className="w-3 h-3 text-[var(--accent)]" /> {step.estimatedHours} hrs
+                            • <Clock className="w-3 h-3 text-[var(--accent)]" /> {step.estimatedTime}
                           </span>
                         )}
                       </div>

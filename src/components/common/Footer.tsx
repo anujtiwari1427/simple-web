@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { BrandLogo } from "./BrandLogo";
 import { InstagramIcon, YoutubeIcon, TelegramIcon, GithubIcon } from "./BrandIcons";
@@ -143,7 +145,7 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="pt-12 mt-12 border-t border-[var(--border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-          <p>© {new Date().getFullYear()} Code Decoded. All rights reserved.</p>
+          <p>© 2026 Code Decoded. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <span>Free education for all students</span>
             <a

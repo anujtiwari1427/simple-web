@@ -78,7 +78,7 @@ export default function BlogHubPage() {
                 <div className="flex items-center gap-3 text-xs text-[var(--muted)] font-display mb-3">
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
-                    <span>{post.readTimeMinutes} min read</span>
+                    <span>{post.readingTimeMinutes} min read</span>
                   </span>
                   <span>•</span>
                   <span>{post.publishedAt}</span>

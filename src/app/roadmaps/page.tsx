@@ -67,7 +67,7 @@ export default function RoadmapsPage() {
                   <div className="flex items-center justify-between gap-2 mb-4">
                     <span className="text-xs text-[var(--muted)] font-display flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
-                      <span>{roadmap.estimatedTime}</span>
+                      <span>{roadmap.duration}</span>
                     </span>
                     <span className="text-xs text-[var(--muted)] font-display flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-[var(--accent)]" />

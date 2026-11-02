@@ -62,22 +62,26 @@ export default function UpdatesPage() {
               </div>
 
               <h2 className="text-base font-display font-semibold text-[var(--heading)] mb-1">
-                {update.linkUrl.startsWith("http") ? (
-                  <a
-                    href={update.linkUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-[var(--accent)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
-                  >
-                    {update.title}
-                  </a>
+                {update.linkUrl ? (
+                  update.linkUrl.startsWith("http") ? (
+                    <a
+                      href={update.linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-[var(--accent)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+                    >
+                      {update.title}
+                    </a>
+                  ) : (
+                    <Link
+                      href={update.linkUrl}
+                      className="hover:text-[var(--accent)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+                    >
+                      {update.title}
+                    </Link>
+                  )
                 ) : (
-                  <Link
-                    href={update.linkUrl}
-                    className="hover:text-[var(--accent)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
-                  >
-                    {update.title}
-                  </Link>
+                  <span>{update.title}</span>
                 )}
               </h2>
 
@@ -85,7 +89,7 @@ export default function UpdatesPage() {
                 {update.description}
               </p>
 
-              {update.linkText && (
+              {update.linkText && update.linkUrl && (
                 <div className="pt-1">
                   {update.linkUrl.startsWith("http") ? (
                     <a

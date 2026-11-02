@@ -48,14 +48,14 @@ export function Testimonials() {
                 <Quote className="w-6 h-6 text-slate-300 dark:text-slate-700 mb-2" />
 
                 <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic">
-                  &quot;{t.content}&quot;
+                  &quot;{t.text}&quot;
                 </p>
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <img
-                    src={t.avatar}
+                    src={t.avatarUrl}
                     alt={t.name}
                     className="w-9 h-9 rounded-full object-cover ring-2 ring-cyan-500/20"
                   />
@@ -64,13 +64,13 @@ export function Testimonials() {
                       {t.name}
                     </h4>
                     <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-medium">
-                      {t.companyOrCollege}
+                      {t.collegeOrCompany}
                     </p>
                   </div>
                 </div>
 
-                <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800" title={t.platform}>
-                  {getPlatformIcon(t.platform)}
+                <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+                  <span className="text-[10px] font-mono font-medium text-cyan-600 dark:text-cyan-400">{t.highlightTag}</span>
                 </div>
               </div>
             </div>
