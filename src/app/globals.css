@@ -1,26 +1,175 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* color */
+  --ink-950: #0A111D;
+  --ink-900: #0F1828;
+  --ink-800: #172338;
+  --ink-700: #22304A;
+  --slate-400: #8FA0B8;
+  --slate-200: #C9D3E3;
+  --paper: #F7F8FA;
+  --signal-500: #3B9DF0;
+  --signal-400: #6BB6F5;
+  --signal-700: #1B6FC9;
+  --success: #3DD68C;
+  --warning: #F5B84B;
+  --danger: #F26D6D;
+
+  /* semantic (dark default) */
+  --bg: var(--ink-900);
+  --bg-deep: var(--ink-950);
+  --surface: var(--ink-800);
+  --border: var(--ink-700);
+  --text: var(--slate-200);
+  --heading: var(--paper);
+  --muted: var(--slate-400);
+  --accent: var(--signal-500);
+  --accent-hover: var(--signal-400);
+
+  /* type */
+  --font-display: var(--font-inter-tight), "Inter Tight", "Inter", system-ui, sans-serif;
+  --font-reading: var(--font-source-serif), "Source Serif 4", Georgia, serif;
+  --font-code: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+
+  /* radius */
+  --r-sm: 6px;
+  --r-md: 12px;
+  --r-lg: 20px;
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+[data-theme="light"],
+.light {
+  --bg: var(--paper);
+  --bg-deep: #EEF1F6;
+  --surface: #FFFFFF;
+  --border: #DDE3EE;
+  --text: #27324A;
+  --heading: #0F1828;
+  --muted: #5B6B85;
+  --accent: var(--signal-700);
+  --accent-hover: #155AA5;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-feature-settings: "ss01", "cv11";
+  overflow-x: hidden;
+  line-height: 1.6;
+  transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+/* Typography styles */
+.font-display {
+  font-family: var(--font-display);
+  font-feature-settings: "ss01", "cv11";
+}
+
+.font-reading {
+  font-family: var(--font-reading);
+}
+
+.font-code {
+  font-family: var(--font-code);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Type scale */
+.text-display {
+  font-size: clamp(2.75rem, 7vw, 5.5rem);
+  font-weight: 800;
+  line-height: 1.0;
+  letter-spacing: -0.035em;
+}
+
+.text-h1 {
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.text-h2 {
+  font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.text-h3 {
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.text-body-ui {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.text-article {
+  font-size: 1.1875rem;
+  font-weight: 400;
+  line-height: 1.75;
+}
+
+.text-small {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.prose-article {
+  max-width: 65ch;
+  font-family: var(--font-reading);
+  font-size: 1.1875rem;
+  line-height: 1.75;
+}
+
+/* Focus styles meeting Section 11 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Hero subtle radial glow (Section 2 rule: one subtle radial glow behind hero only) */
+.hero-glow {
+  background: radial-gradient(circle at 35% 40%, rgba(59, 157, 240, 0.12) 0%, rgba(15, 24, 40, 0) 70%);
+}
+
+.light .hero-glow {
+  background: radial-gradient(circle at 35% 40%, rgba(27, 111, 201, 0.08) 0%, rgba(247, 248, 250, 0) 70%);
+}
+
+/* Custom scrollbars matching theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
