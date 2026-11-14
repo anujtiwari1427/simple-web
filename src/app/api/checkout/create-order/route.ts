@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { initialResources } from "@/data/resourcesData";
-import { readFile } from "fs/promises";
-import path from "path";
-
-const configPath = path.join(process.cwd(), "src", "data", "gatewayConfig.json");
+import { getServerConfig } from "@/lib/serverConfig";
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,14 +28,8 @@ export async function POST(req: NextRequest) {
 
     const amountInPaise = Math.round(amountInRupees * 100);
 
-    // Read config from file or env
-    let fileConfig: any = {};
-    try {
-      const raw = await readFile(configPath, "utf-8");
-      fileConfig = JSON.parse(raw);
-    } catch {
-      fileConfig = {};
-    }
+    // Read config safely
+    const fileConfig = await getServerConfig();
 
     const keyId =
       fileConfig.razorpayKeyId ||

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile } from "fs/promises";
-import path from "path";
 import crypto from "crypto";
-
-const configPath = path.join(process.cwd(), "src", "data", "gatewayConfig.json");
+import { getServerConfig } from "@/lib/serverConfig";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,15 +13,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Read stored password or env
-    let storedPassword = process.env.ADMIN_PASSWORD || "admin123";
-    try {
-      const raw = await readFile(configPath, "utf-8");
-      const config = JSON.parse(raw);
-      if (config.adminPassword) {
-        storedPassword = config.adminPassword;
-      }
-    } catch {}
+    const config = await getServerConfig();
+    const storedPassword = config.adminPassword || "admin123";
 
     if (password !== storedPassword) {
       return NextResponse.json(

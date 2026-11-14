@@ -381,7 +381,7 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setPassChangeStatus({ type: "success", msg: "✓ Admin passcode updated successfully!" });
+        setPassChangeStatus({ type: "success", msg: data.message || "✓ Admin passcode updated successfully!" });
         setCurrentPass("");
         setNewPass("");
         setConfirmPass("");
@@ -1253,11 +1253,13 @@ export default function AdminPage() {
                 </button>
               </form>
 
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-1">
-                <p className="font-semibold text-slate-700 dark:text-slate-300">Security Details:</p>
-                <ul className="list-disc list-inside space-y-0.5">
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-1.5">
+                <p className="font-semibold text-slate-700 dark:text-slate-300">Security & Cloud Deployment Details:</p>
+                <ul className="list-disc list-inside space-y-1">
                   <li>Password is authenticated server-side using secure HTTP-only cookies.</li>
-                  <li>You can also configure <code className="font-mono text-cyan-600 dark:text-cyan-400">ADMIN_PASSWORD</code> in your environment variables.</li>
+                  <li>
+                    <strong className="text-slate-700 dark:text-slate-200">For Vercel / Cloud deployments:</strong> Cloud serverless runtimes have read-only filesystems. Passcode updates are saved to runtime memory &amp; temp storage. For permanent persistence across all Vercel instances, you can also set <code className="font-mono text-cyan-600 dark:text-cyan-400 font-bold">ADMIN_PASSWORD</code> in your <strong className="text-cyan-600 dark:text-cyan-400">Vercel Project Settings &gt; Environment Variables</strong>.
+                  </li>
                   <li>Session remains active for 7 days unless you manually sign out.</li>
                 </ul>
               </div>

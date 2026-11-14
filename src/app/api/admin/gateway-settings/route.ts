@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile } from "fs/promises";
-import path from "path";
-
-const configPath = path.join(process.cwd(), "src", "data", "gatewayConfig.json");
+import { getServerConfig, saveServerConfig } from "@/lib/serverConfig";
 
 export async function GET() {
   try {
-    const raw = await readFile(configPath, "utf-8");
-    const config = JSON.parse(raw);
+    const config = await getServerConfig();
 
-    // Return masked config
     return NextResponse.json({
       success: true,
       config: {
@@ -22,7 +17,7 @@ export async function GET() {
         isLive: Boolean(config.isLive),
       },
     });
-  } catch (err: unknown) {
+  } catch {
     return NextResponse.json({
       success: true,
       config: {
@@ -41,35 +36,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { upiId, upiName, razorpayKeyId, razorpayKeySecret, preferredMethod } = body;
 
-    let existing: any = {};
-    try {
-      const raw = await readFile(configPath, "utf-8");
-      existing = JSON.parse(raw);
-    } catch {
-      existing = {};
-    }
+    const current = await getServerConfig();
 
-    const updated = {
-      ...existing,
-      upiId: upiId || existing.upiId || "codedecoded@upi",
-      upiName: upiName || existing.upiName || "Code Decoded",
-      razorpayKeyId: razorpayKeyId !== undefined ? razorpayKeyId : existing.razorpayKeyId || "",
-      razorpayKeySecret: razorpayKeySecret !== undefined ? razorpayKeySecret : existing.razorpayKeySecret || "",
-      preferredMethod: preferredMethod || existing.preferredMethod || "both",
+    const updated = await saveServerConfig({
+      upiId: upiId || current.upiId || "codedecoded@upi",
+      upiName: upiName || current.upiName || "Code Decoded",
+      razorpayKeyId: razorpayKeyId !== undefined ? razorpayKeyId : current.razorpayKeyId || "",
+      razorpayKeySecret:
+        razorpayKeySecret !== undefined ? razorpayKeySecret : current.razorpayKeySecret || "",
+      preferredMethod: preferredMethod || current.preferredMethod || "both",
       isLive: Boolean(razorpayKeyId && !razorpayKeyId.includes("test")),
-      updatedAt: new Date().toISOString(),
-    };
-
-    await writeFile(configPath, JSON.stringify(updated, null, 2), "utf-8");
-
-    // Also update runtime process.env if provided
-    if (updated.razorpayKeyId) {
-      process.env.RAZORPAY_KEY_ID = updated.razorpayKeyId;
-      process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID = updated.razorpayKeyId;
-    }
-    if (updated.razorpayKeySecret) {
-      process.env.RAZORPAY_KEY_SECRET = updated.razorpayKeySecret;
-    }
+    });
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import os from "os";
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,23 +34,38 @@ export async function POST(req: NextRequest) {
       .slice(0, 50);
     const uniqueFileName = `${baseCleanName}-${Date.now()}${extension}`;
 
-    // Target upload directory
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadDir, { recursive: true });
-
-    const filePath = path.join(uploadDir, uniqueFileName);
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    await writeFile(filePath, buffer);
+    let publicUrl = `/uploads/${uniqueFileName}`;
+
+    // Target upload directory
+    const uploadDir = path.join(process.cwd(), "public", "uploads");
+    try {
+      await mkdir(uploadDir, { recursive: true });
+      const filePath = path.join(uploadDir, uniqueFileName);
+      await writeFile(filePath, buffer);
+    } catch (fsErr: unknown) {
+      // EROFS on Vercel/serverless environments
+      console.warn("[Upload] Could not write to public/uploads (read-only filesystem on serverless):", fsErr);
+      const tempDir = path.join(os.tmpdir(), "codedecoded-uploads");
+      try {
+        await mkdir(tempDir, { recursive: true });
+        await writeFile(path.join(tempDir, uniqueFileName), buffer);
+      } catch {}
+      // Serve via data url fallback if under 4MB or download endpoint
+      if (file.size < 4 * 1024 * 1024) {
+        publicUrl = `data:application/pdf;base64,${buffer.toString("base64")}`;
+      } else {
+        publicUrl = `/uploads/${uniqueFileName}`;
+      }
+    }
 
     // Human readable size
     let formattedSize = `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
     if (file.size < 1024 * 1024) {
       formattedSize = `${Math.round(file.size / 1024)} KB`;
     }
-
-    const publicUrl = `/uploads/${uniqueFileName}`;
 
     return NextResponse.json({
       success: true,

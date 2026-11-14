@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile } from "fs/promises";
-import path from "path";
-
-const configPath = path.join(process.cwd(), "src", "data", "gatewayConfig.json");
+import { getServerConfig, saveServerConfig } from "@/lib/serverConfig";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,39 +7,34 @@ export async function POST(req: NextRequest) {
 
     if (!newPassword || newPassword.length < 4) {
       return NextResponse.json(
-        { success: false, error: "New password must be at least 4 characters long." },
+        { success: false, error: "New passcode must be at least 4 characters long." },
         { status: 400 }
       );
     }
 
-    let existing: any = {};
-    try {
-      const raw = await readFile(configPath, "utf-8");
-      existing = JSON.parse(raw);
-    } catch {
-      existing = {};
-    }
-
-    const currentActual = existing.adminPassword || process.env.ADMIN_PASSWORD || "admin123";
+    const currentConfig = await getServerConfig();
+    const currentActual = currentConfig.adminPassword || "admin123";
 
     if (currentPassword !== currentActual) {
       return NextResponse.json(
-        { success: false, error: "Current password does not match." },
+        { success: false, error: "Current passcode does not match. (Default is admin123)" },
         { status: 400 }
       );
     }
 
-    existing.adminPassword = newPassword;
-    await writeFile(configPath, JSON.stringify(existing, null, 2), "utf-8");
+    await saveServerConfig({ adminPassword: newPassword });
 
-    process.env.ADMIN_PASSWORD = newPassword;
+    const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
     return NextResponse.json({
       success: true,
-      message: "Admin password successfully changed!",
+      message: isServerless
+        ? "Admin passcode updated successfully for this deployment! (Tip: You can also set ADMIN_PASSWORD in your Vercel Project Settings for permanent persistence across all instances)"
+        : "Admin passcode successfully changed!",
+      isServerless,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Error changing password";
+    const msg = err instanceof Error ? err.message : "Error changing passcode";
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }

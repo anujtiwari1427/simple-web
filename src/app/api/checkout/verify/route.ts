@@ -3,9 +3,11 @@ import crypto from "crypto";
 import { initialResources } from "@/data/resourcesData";
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
+import os from "os";
+import { getServerConfig } from "@/lib/serverConfig";
 
-const configPath = path.join(process.cwd(), "src", "data", "gatewayConfig.json");
 const ordersPath = path.join(process.cwd(), "src", "data", "orders.json");
+const tempOrdersPath = path.join(os.tmpdir(), "codedecoded-orders.json");
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,15 +25,8 @@ export async function POST(req: NextRequest) {
       isMock,
     } = body;
 
-    // Read config
-    let fileConfig: any = {};
-    try {
-      const raw = await readFile(configPath, "utf-8");
-      fileConfig = JSON.parse(raw);
-    } catch {
-      fileConfig = {};
-    }
-
+    // Read config safely
+    const fileConfig = await getServerConfig();
     const keySecret = fileConfig.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
 
     // Real Razorpay signature verification
@@ -82,19 +77,30 @@ export async function POST(req: NextRequest) {
       downloadUrl,
     };
 
-    // Save to server-side orders.json
+    // Save to orders (tries project file, falls back to /tmp on serverless)
     try {
       let ordersList: any[] = [];
       try {
         const rawOrders = await readFile(ordersPath, "utf-8");
         ordersList = JSON.parse(rawOrders);
       } catch {
-        ordersList = [];
+        try {
+          const rawTemp = await readFile(tempOrdersPath, "utf-8");
+          ordersList = JSON.parse(rawTemp);
+        } catch {
+          ordersList = [];
+        }
       }
       ordersList.unshift(newOrder);
-      await writeFile(ordersPath, JSON.stringify(ordersList, null, 2), "utf-8");
+
+      try {
+        await writeFile(ordersPath, JSON.stringify(ordersList, null, 2), "utf-8");
+      } catch {
+        // Fallback to /tmp on serverless (Vercel)
+        await writeFile(tempOrdersPath, JSON.stringify(ordersList, null, 2), "utf-8");
+      }
     } catch (saveErr) {
-      console.warn("Could not save to orders.json:", saveErr);
+      console.warn("Could not save to orders file:", saveErr);
     }
 
     console.log(
