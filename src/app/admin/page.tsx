@@ -18,18 +18,39 @@ import {
   ArrowUpRight,
   Receipt,
   Download,
-  AlertCircle
+  AlertCircle,
+  LogOut,
+  Key,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { initialResources } from "@/data/resourcesData";
 import { initialUpdates } from "@/data/updatesData";
 import { Resource, UpdateAnnouncement, ResourceTopic, ResourceType, Difficulty, Order } from "@/types";
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"resources" | "orders" | "gateway" | "announcements" | "stats">("resources");
+  const [activeTab, setActiveTab] = useState<"resources" | "orders" | "gateway" | "security" | "announcements" | "stats">("resources");
   const [resources, setResources] = useState<Resource[]>(initialResources);
   const [updates, setUpdates] = useState<UpdateAnnouncement[]>(initialUpdates);
   const [orders, setOrders] = useState<Order[]>([]);
   const [statusMessage, setStatusMessage] = useState("");
+
+  // Admin authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [checkingAuth, setCheckingAuth] = useState<boolean>(true);
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  // Change Password state
+  const [currentPass, setCurrentPass] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [passChangeStatus, setPassChangeStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Uploading state
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -91,6 +112,19 @@ export default function AdminPage() {
   const [savingGateway, setSavingGateway] = useState(false);
 
   useEffect(() => {
+    // Check admin authentication session
+    fetch("/api/admin/check-auth")
+      .then(res => res.json())
+      .then(data => {
+        setIsAuthenticated(Boolean(data?.authenticated));
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+      })
+      .finally(() => {
+        setCheckingAuth(false);
+      });
+
     // Load gateway settings
     fetch("/api/admin/gateway-settings")
       .then(res => res.json())
@@ -289,7 +323,178 @@ export default function AdminPage() {
     }
   };
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setLoggingIn(true);
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: loginPassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsAuthenticated(true);
+        setLoginPassword("");
+        setStatusMessage("✓ Welcome back, Admin! Access granted.");
+        setTimeout(() => setStatusMessage(""), 4000);
+      } else {
+        setLoginError(data.error || "Incorrect password. Default is admin123");
+      }
+    } catch {
+      setLoginError("Could not reach authentication server.");
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch {
+      // ignore
+    } finally {
+      setIsAuthenticated(false);
+      setStatusMessage("Logged out successfully.");
+      setTimeout(() => setStatusMessage(""), 3000);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassChangeStatus(null);
+    if (newPass !== confirmPass) {
+      setPassChangeStatus({ type: "error", msg: "New passwords do not match." });
+      return;
+    }
+    if (newPass.length < 4) {
+      setPassChangeStatus({ type: "error", msg: "Password must be at least 4 characters long." });
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const res = await fetch("/api/admin/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: currentPass, newPassword: newPass })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPassChangeStatus({ type: "success", msg: "✓ Admin passcode updated successfully!" });
+        setCurrentPass("");
+        setNewPass("");
+        setConfirmPass("");
+      } else {
+        setPassChangeStatus({ type: "error", msg: data.error || "Failed to update passcode." });
+      }
+    } catch {
+      setPassChangeStatus({ type: "error", msg: "Network error while updating passcode." });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const totalRevenue = orders.reduce((sum, o) => sum + (o.status === "paid" ? o.amount : 0), 0);
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center py-20 px-4">
+        <div className="w-14 h-14 rounded-3xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center animate-pulse mb-4">
+          <Lock className="w-7 h-7 text-cyan-500" />
+        </div>
+        <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+          Checking admin security credentials...
+        </p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center py-16 px-4">
+        <div className="w-full max-w-md p-8 sm:p-10 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl relative overflow-hidden">
+          {/* Subtle accent glows */}
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative space-y-6">
+            <div className="text-center space-y-2">
+              <div className="inline-flex p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 mb-1">
+                <Shield className="w-7 h-7" />
+              </div>
+              <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                Admin Portal Login
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Enter your admin passcode to manage resources, view student orders, and configure payment gateways.
+              </p>
+            </div>
+
+            {loginError && (
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Admin Passcode
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Enter admin password..."
+                    required
+                    autoFocus
+                    className="w-full pl-10 pr-10 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loggingIn || !loginPassword}
+                className="w-full py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-cyan-400 to-sky-500 hover:brightness-110 text-slate-950 transition shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
+              >
+                <Lock className="w-4 h-4" />
+                <span>{loggingIn ? "Verifying Passcode..." : "Unlock Dashboard"}</span>
+              </button>
+            </form>
+
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 text-center space-y-3">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-600 dark:text-slate-400">
+                <Key className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                <span>Default passcode: <code className="font-mono text-cyan-600 dark:text-cyan-400 font-bold">admin123</code></span>
+              </div>
+              <div>
+                <a
+                  href="/"
+                  className="text-xs text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400 transition"
+                >
+                  &larr; Return to Code Decoded Home
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-12 sm:py-16">
@@ -297,9 +502,15 @@ export default function AdminPage() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 text-xs font-semibold">
-              <Shield className="w-3.5 h-3.5" />
-              <span>Admin Management & Monetization</span>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 text-xs font-semibold">
+                <Shield className="w-3.5 h-3.5" />
+                <span>Admin Management & Monetization</span>
+              </div>
+              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Authenticated</span>
+              </div>
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">
               Code Decoded Admin Dashboard
@@ -309,61 +520,82 @@ export default function AdminPage() {
             </p>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-x-auto">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setActiveTab("resources")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
-                activeTab === "resources"
-                  ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
-                  : "text-slate-600 dark:text-slate-400"
-              }`}
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 transition cursor-pointer"
             >
-              Upload & Resources ({resources.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("orders")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1 ${
-                activeTab === "orders"
-                  ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm"
-                  : "text-slate-600 dark:text-slate-400"
-              }`}
-            >
-              <Receipt className="w-3.5 h-3.5" />
-              <span>Orders & Sales (₹{totalRevenue})</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("gateway")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1 ${
-                activeTab === "gateway"
-                  ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
-                  : "text-slate-600 dark:text-slate-400"
-              }`}
-            >
-              <CreditCard className="w-3.5 h-3.5" />
-              <span>Payment Gateway</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("announcements")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
-                activeTab === "announcements"
-                  ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
-                  : "text-slate-600 dark:text-slate-400"
-              }`}
-            >
-              Announcements
-            </button>
-            <button
-              onClick={() => setActiveTab("stats")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
-                activeTab === "stats"
-                  ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
-                  : "text-slate-600 dark:text-slate-400"
-              }`}
-            >
-              Platform Stats
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
             </button>
           </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab("resources")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
+              activeTab === "resources"
+                ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            Upload & Resources ({resources.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("orders")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1 ${
+              activeTab === "orders"
+                ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            <span>Orders & Sales (₹{totalRevenue})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("gateway")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1 ${
+              activeTab === "gateway"
+                ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Payment Gateway</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("security")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1 ${
+              activeTab === "security"
+                ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            <Key className="w-3.5 h-3.5" />
+            <span>Admin Passcode</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("announcements")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
+              activeTab === "announcements"
+                ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            Announcements
+          </button>
+          <button
+            onClick={() => setActiveTab("stats")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
+              activeTab === "stats"
+                ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            Platform Stats
+          </button>
         </div>
 
         {/* Status Toast Notification */}
@@ -913,7 +1145,127 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 4: ANNOUNCEMENTS */}
+        {/* TAB 4: SECURITY & ADMIN PASSCODE */}
+        {activeTab === "security" && (
+          <div className="max-w-2xl space-y-6">
+            <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-500">
+                  <Key className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                    Change Admin Passcode
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Update the secret access password for this admin portal.
+                  </p>
+                </div>
+              </div>
+
+              {passChangeStatus && (
+                <div
+                  className={`p-4 rounded-2xl text-xs font-semibold flex items-center gap-2 ${
+                    passChangeStatus.type === "success"
+                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                      : "bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400"
+                  }`}
+                >
+                  {passChangeStatus.type === "success" ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{passChangeStatus.msg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleChangePassword} className="space-y-4 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Current Passcode *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPass ? "text" : "password"}
+                      required
+                      value={currentPass}
+                      onChange={e => setCurrentPass(e.target.value)}
+                      placeholder="Enter current password (default: admin123)"
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white pr-10 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPass(!showCurrentPass)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      {showCurrentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      New Passcode *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNewPass ? "text" : "password"}
+                        required
+                        value={newPass}
+                        onChange={e => setNewPass(e.target.value)}
+                        placeholder="Min 4 characters"
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white pr-10 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPass(!showNewPass)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      >
+                        {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Confirm New Passcode *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={confirmPass}
+                      onChange={e => setConfirmPass(e.target.value)}
+                      placeholder="Re-enter new password"
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={changingPassword || !currentPass || !newPass || !confirmPass}
+                  className="px-6 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-cyan-400 to-sky-500 hover:brightness-110 text-slate-950 transition shadow-lg shadow-cyan-500/25 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>{changingPassword ? "Updating Passcode..." : "Update Passcode"}</span>
+                </button>
+              </form>
+
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-1">
+                <p className="font-semibold text-slate-700 dark:text-slate-300">Security Details:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>Password is authenticated server-side using secure HTTP-only cookies.</li>
+                  <li>You can also configure <code className="font-mono text-cyan-600 dark:text-cyan-400">ADMIN_PASSWORD</code> in your environment variables.</li>
+                  <li>Session remains active for 7 days unless you manually sign out.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: ANNOUNCEMENTS */}
         {activeTab === "announcements" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-xs">
             <div className="lg:col-span-5 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">

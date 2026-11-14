@@ -4,5 +4,6 @@
   "razorpayKeyId": "",
   "razorpayKeySecret": "",
   "preferredMethod": "both",
-  "isLive": false
+  "isLive": false,
+  "adminPassword": "admin123"
 }
