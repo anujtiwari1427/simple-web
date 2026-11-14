@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter_Tight, Source_Serif_4, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import Script from "next/script";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
@@ -92,6 +93,7 @@ export default function RootLayout({
         <JsonLd />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--text)] selection:bg-[var(--accent)] selection:text-[var(--ink-950)]">
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

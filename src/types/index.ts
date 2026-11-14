@@ -28,6 +28,7 @@ export interface Resource {
   tags: string[];
   downloadUrl: string;
   previewUrl?: string;
+  fileUrl?: string;
   downloadsCount: number;
   isNew?: boolean;
   isFeatured?: boolean;
@@ -36,6 +37,38 @@ export interface Resource {
   pageCount?: number;
   author: string;
   keyTakeaways: string[];
+  // Pricing and E-commerce fields
+  isPaid?: boolean;
+  price?: number; // In INR (₹), 0 = Free
+  originalPrice?: number; // In INR (₹) for showing discount/strike-through
+}
+
+export interface Order {
+  id: string;
+  orderId: string;
+  resourceId: string;
+  resourceTitle: string;
+  amount: number;
+  currency: string;
+  status: 'paid' | 'pending' | 'failed';
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  paymentId?: string;
+  paymentMethod?: 'upi' | 'card' | 'netbanking' | 'mock';
+  downloadUrl: string;
+  createdAt: string;
+}
+
+export interface PaymentVerificationPayload {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature?: string;
+  resourceId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  isMock?: boolean;
 }
 
 export interface RoadmapStep {

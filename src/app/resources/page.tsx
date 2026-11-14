@@ -9,12 +9,14 @@ import { Resource } from "@/types";
 const TOPICS = ["All", "Python", "Web dev", "DSA", "DBMS", "Data science"];
 const TYPES = ["All", "Cheat Sheet", "PDF", "Notes", "Repo"];
 const DIFFICULTIES = ["All", "Beginner", "Intermediate", "Advanced"];
+const PRICES = ["All", "Free", "Paid"];
 
 export default function ResourcesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTopic, setSelectedTopic] = useState("All");
   const [selectedType, setSelectedType] = useState("All");
   const [selectedDifficulty, setSelectedDifficulty] = useState("All");
+  const [selectedPrice, setSelectedPrice] = useState("All");
   const [sortBy, setSortBy] = useState<"newest" | "popular">("newest");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [resources, setResources] = useState<Resource[]>(initialResources);
@@ -62,6 +64,12 @@ export default function ResourcesPage() {
           if (res.difficulty.toLowerCase() !== selectedDifficulty.toLowerCase()) return false;
         }
 
+        if (selectedPrice === "Free") {
+          if (res.isPaid) return false;
+        } else if (selectedPrice === "Paid") {
+          if (!res.isPaid) return false;
+        }
+
         return true;
       })
       .sort((a, b) => {
@@ -73,20 +81,22 @@ export default function ResourcesPage() {
         }
         return (b.downloadsCount || 0) - (a.downloadsCount || 0);
       });
-  }, [resources, searchQuery, selectedTopic, selectedType, selectedDifficulty, sortBy]);
+  }, [resources, searchQuery, selectedTopic, selectedType, selectedDifficulty, selectedPrice, sortBy]);
 
   const clearAllFilters = () => {
     setSearchQuery("");
     setSelectedTopic("All");
     setSelectedType("All");
     setSelectedDifficulty("All");
+    setSelectedPrice("All");
   };
 
   const hasActiveFilters =
     searchQuery ||
     selectedTopic !== "All" ||
     selectedType !== "All" ||
-    selectedDifficulty !== "All";
+    selectedDifficulty !== "All" ||
+    selectedPrice !== "All";
 
   return (
     <div className="py-12 sm:py-16">
@@ -215,6 +225,28 @@ export default function ResourcesPage() {
                     }`}
                   >
                     <span>{diff}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Pricing Filter */}
+            <div className="pt-4 border-t border-[var(--border)]">
+              <h3 className="text-xs font-semibold text-[var(--heading)] uppercase tracking-wider mb-3">
+                Pricing
+              </h3>
+              <div className="space-y-1">
+                {PRICES.map(price => (
+                  <button
+                    key={price}
+                    onClick={() => setSelectedPrice(price)}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-[6px] text-sm font-display text-left transition-colors cursor-pointer ${
+                      selectedPrice === price
+                        ? "bg-[var(--surface)] text-[var(--accent)] font-semibold border border-[var(--accent)]"
+                        : "text-[var(--muted)] hover:text-[var(--heading)] hover:bg-[var(--surface)]/50"
+                    }`}
+                  >
+                    <span>{price === "All" ? "All resources" : price === "Free" ? "Free (₹0)" : "Premium (Paid)"}</span>
                   </button>
                 ))}
               </div>
@@ -354,6 +386,28 @@ export default function ResourcesPage() {
                       }`}
                     >
                       {diff}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mobile Pricing */}
+              <div className="mb-6">
+                <span className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider block mb-2">
+                  Pricing
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {PRICES.map(price => (
+                    <button
+                      key={price}
+                      onClick={() => setSelectedPrice(price)}
+                      className={`px-3 py-1.5 rounded-[6px] text-xs font-display ${
+                        selectedPrice === price
+                          ? "bg-[var(--accent)] text-[var(--ink-950)] font-semibold"
+                          : "bg-[var(--bg-deep)] text-[var(--text)] border border-[var(--border)]"
+                      }`}
+                    >
+                      {price === "All" ? "All" : price === "Free" ? "Free (₹0)" : "Paid"}
                     </button>
                   ))}
                 </div>

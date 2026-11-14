@@ -1,0 +1,8 @@
+{
+  "upiId": "codedecoded@upi",
+  "upiName": "Code Decoded",
+  "razorpayKeyId": "",
+  "razorpayKeySecret": "",
+  "preferredMethod": "both",
+  "isLive": false
+}

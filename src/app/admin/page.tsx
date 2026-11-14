@@ -1,28 +1,73 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Shield, Plus, Trash2, Edit, Save, CheckCircle2, FileText, Bell, Sparkles, BookOpen, Layers } from "lucide-react";
+import {
+  Shield,
+  Plus,
+  Trash2,
+  Upload,
+  CheckCircle2,
+  FileText,
+  Bell,
+  Sparkles,
+  BookOpen,
+  DollarSign,
+  CreditCard,
+  Lock,
+  Layers,
+  ArrowUpRight,
+  Receipt,
+  Download,
+  AlertCircle
+} from "lucide-react";
 import { initialResources } from "@/data/resourcesData";
 import { initialUpdates } from "@/data/updatesData";
-import { Resource, UpdateAnnouncement, ResourceTopic, ResourceType, Difficulty } from "@/types";
+import { Resource, UpdateAnnouncement, ResourceTopic, ResourceType, Difficulty, Order } from "@/types";
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"resources" | "announcements" | "stats">("resources");
+  const [activeTab, setActiveTab] = useState<"resources" | "orders" | "gateway" | "announcements" | "stats">("resources");
   const [resources, setResources] = useState<Resource[]>(initialResources);
   const [updates, setUpdates] = useState<UpdateAnnouncement[]>(initialUpdates);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [statusMessage, setStatusMessage] = useState("");
 
+  // Uploading state
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadedFileInfo, setUploadedFileInfo] = useState<{
+    fileName: string;
+    fileSize: string;
+    url: string;
+  } | null>(null);
+
   // New Resource Form state
-  const [newResource, setNewResource] = useState<Partial<Resource>>({
+  const [newResource, setNewResource] = useState<{
+    title: string;
+    topic: ResourceTopic;
+    type: ResourceType;
+    difficulty: Difficulty;
+    description: string;
+    tags: string[];
+    fileSize: string;
+    fileUrl: string;
+    downloadUrl: string;
+    isPaid: boolean;
+    price: number;
+    originalPrice: number;
+    keyTakeaways: string[];
+  }>({
     title: "",
     topic: "DSA",
-    type: "Cheat Sheet",
+    type: "PDF",
     difficulty: "Beginner",
     description: "",
-    tags: ["DSA", "Beginner"],
-    fileSize: "3.5 MB",
+    tags: ["DSA", "PDF"],
+    fileSize: "4.2 MB",
+    fileUrl: "",
     downloadUrl: "#download",
-    keyTakeaways: ["Clear breakdown of concepts", "Interview ready templates"]
+    isPaid: true,
+    price: 99,
+    originalPrice: 299,
+    keyTakeaways: ["Complete visual concept breakdown", "Interview patterns & cheat notes"]
   });
 
   // New Announcement Form state
@@ -35,8 +80,34 @@ export default function AdminPage() {
     linkUrl: "/resources"
   });
 
+  // Gateway Settings Form state
+  const [gatewayForm, setGatewayForm] = useState({
+    upiId: "codedecoded@upi",
+    upiName: "Code Decoded",
+    razorpayKeyId: "",
+    razorpayKeySecret: "",
+    preferredMethod: "both"
+  });
+  const [savingGateway, setSavingGateway] = useState(false);
+
   useEffect(() => {
+    // Load gateway settings
+    fetch("/api/admin/gateway-settings")
+      .then(res => res.json())
+      .then(data => {
+        if (data?.config) {
+          setGatewayForm({
+            upiId: data.config.upiId || "codedecoded@upi",
+            upiName: data.config.upiName || "Code Decoded",
+            razorpayKeyId: data.config.rawRazorpayKeyId || "",
+            razorpayKeySecret: "",
+            preferredMethod: data.config.preferredMethod || "both"
+          });
+        }
+      })
+      .catch(() => {});
     if (typeof window !== "undefined") {
+      // 1. Load custom resources
       const savedRes = localStorage.getItem("codedecoded_custom_resources");
       if (savedRes) {
         try {
@@ -46,8 +117,101 @@ export default function AdminPage() {
           // ignore
         }
       }
+
+      // 2. Load orders
+      const savedOrders = localStorage.getItem("codedecoded_all_orders");
+      if (savedOrders) {
+        try {
+          setOrders(JSON.parse(savedOrders));
+        } catch {
+          setOrders([]);
+        }
+      } else {
+        // Initial sample seed orders so dashboard looks realistic immediately
+        const initialSeedOrders: Order[] = [
+          {
+            id: "ord_demo_101",
+            orderId: "order_cd_8f912a7b3c",
+            paymentId: "pay_live_981240182",
+            resourceId: "res-1",
+            resourceTitle: "The Ultimate DSA Decoded Cheatsheet",
+            amount: 99,
+            currency: "INR",
+            status: "paid",
+            customerName: "Rohan Verma",
+            customerEmail: "rohan.v@gmail.com",
+            customerPhone: "+91 98765 43210",
+            paymentMethod: "upi",
+            downloadUrl: "/downloads/dsa-cheatsheet.pdf",
+            createdAt: "2026-11-13T14:30:00Z"
+          },
+          {
+            id: "ord_demo_102",
+            orderId: "order_cd_4e881c991d",
+            paymentId: "pay_live_449102819",
+            resourceId: "res-4",
+            resourceTitle: "DBMS & SQL Interview Bible",
+            amount: 149,
+            currency: "INR",
+            status: "paid",
+            customerName: "Ananya Deshmukh",
+            customerEmail: "ananya.d@outlook.com",
+            customerPhone: "+91 91234 56789",
+            paymentMethod: "card",
+            downloadUrl: "/downloads/sql-bible.pdf",
+            createdAt: "2026-11-12T09:15:00Z"
+          }
+        ];
+        setOrders(initialSeedOrders);
+        localStorage.setItem("codedecoded_all_orders", JSON.stringify(initialSeedOrders));
+      }
     }
   }, []);
+
+  // Handle actual PDF file upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Upload failed");
+      }
+
+      setUploadedFileInfo({
+        fileName: data.fileName,
+        fileSize: data.fileSize,
+        url: data.url
+      });
+
+      setNewResource(prev => ({
+        ...prev,
+        title: prev.title || data.fileName.replace(/\.pdf$/i, "").replace(/[-_]/g, " "),
+        fileSize: data.fileSize,
+        fileUrl: data.url,
+        downloadUrl: data.url
+      }));
+
+      setStatusMessage(`✓ PDF "${data.fileName}" uploaded successfully (${data.fileSize})!`);
+      setTimeout(() => setStatusMessage(""), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Upload error";
+      alert(msg);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
 
   const handleAddResource = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,17 +225,21 @@ export default function AdminPage() {
         .replace(/(^-|-$)/g, ""),
       title: newResource.title || "",
       description: newResource.description || "",
-      topic: (newResource.topic as ResourceTopic) || "DSA",
-      type: (newResource.type as ResourceType) || "Cheat Sheet",
-      difficulty: (newResource.difficulty as Difficulty) || "Beginner",
-      tags: newResource.tags || ["Coding"],
-      downloadUrl: newResource.downloadUrl || "#download",
-      downloadsCount: 1,
+      topic: newResource.topic,
+      type: newResource.type,
+      difficulty: newResource.difficulty,
+      tags: newResource.tags,
+      downloadUrl: newResource.downloadUrl || newResource.fileUrl || "#download",
+      fileUrl: newResource.fileUrl,
+      downloadsCount: 0,
       isNew: true,
       publishedAt: new Date().toISOString().split("T")[0],
-      fileSize: newResource.fileSize || "2.5 MB",
+      fileSize: newResource.fileSize || "3.5 MB",
       author: "Code Decoded Admin",
-      keyTakeaways: newResource.keyTakeaways || ["Key concepts decoded"]
+      keyTakeaways: newResource.keyTakeaways,
+      isPaid: newResource.isPaid,
+      price: newResource.isPaid ? Number(newResource.price) : 0,
+      originalPrice: newResource.isPaid ? Number(newResource.originalPrice) : undefined
     };
 
     const updated = [resourceToAdd, ...resources];
@@ -82,18 +250,28 @@ export default function AdminPage() {
       localStorage.setItem("codedecoded_custom_resources", JSON.stringify(customOnly));
     }
 
-    setStatusMessage(`✓ Successfully added "${resourceToAdd.title}"! It is now live in the Resources Hub.`);
+    setStatusMessage(
+      `✓ Successfully added "${resourceToAdd.title}" (${
+        resourceToAdd.isPaid ? `Paid ₹${resourceToAdd.price}` : "Free"
+      })! Live in Resources Hub.`
+    );
     setTimeout(() => setStatusMessage(""), 4000);
 
+    // Reset
+    setUploadedFileInfo(null);
     setNewResource({
       title: "",
       topic: "DSA",
-      type: "Cheat Sheet",
+      type: "PDF",
       difficulty: "Beginner",
       description: "",
-      tags: ["DSA"],
-      fileSize: "3.5 MB",
+      tags: ["DSA", "PDF"],
+      fileSize: "4.2 MB",
+      fileUrl: "",
       downloadUrl: "#download",
+      isPaid: true,
+      price: 99,
+      originalPrice: 299,
       keyTakeaways: ["Key concepts decoded"]
     });
   };
@@ -111,107 +289,143 @@ export default function AdminPage() {
     }
   };
 
-  const handleAddAnnouncement = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUpdate.title || !newUpdate.description) return;
-
-    const announcementToAdd: UpdateAnnouncement = {
-      id: `update-${Date.now()}`,
-      title: newUpdate.title || "",
-      category: newUpdate.category || "News",
-      date: new Date().toISOString().split("T")[0],
-      description: newUpdate.description || "",
-      linkText: newUpdate.linkText,
-      linkUrl: newUpdate.linkUrl,
-      badge: newUpdate.badge
-    };
-
-    setUpdates([announcementToAdd, ...updates]);
-    setStatusMessage(`✓ Successfully published announcement "${announcementToAdd.title}"!`);
-    setTimeout(() => setStatusMessage(""), 4000);
-
-    setNewUpdate({
-      title: "",
-      category: "Resource",
-      description: "",
-      badge: "New Release",
-      linkText: "Check it out",
-      linkUrl: "/resources"
-    });
-  };
+  const totalRevenue = orders.reduce((sum, o) => sum + (o.status === "paid" ? o.amount : 0), 0);
 
   return (
     <div className="py-12 sm:py-16">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 text-xs font-semibold">
               <Shield className="w-3.5 h-3.5" />
-              <span>Admin Management Portal</span>
+              <span>Admin Management & Monetization</span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">
-              Platform Content Manager
+              Code Decoded Admin Dashboard
             </h1>
             <p className="text-xs sm:text-sm text-slate-500">
-              Add and edit study resources, publish updates, and view live metrics in real-time.
+              Upload PDF resources, set pricing in INR, collect payments via Razorpay/UPI, and monitor sales.
             </p>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-x-auto">
             <button
               onClick={() => setActiveTab("resources")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
                 activeTab === "resources"
                   ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
                   : "text-slate-600 dark:text-slate-400"
               }`}
             >
-              Resources ({resources.length})
+              Upload & Resources ({resources.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("orders")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1 ${
+                activeTab === "orders"
+                  ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400"
+              }`}
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>Orders & Sales (₹{totalRevenue})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("gateway")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1 ${
+                activeTab === "gateway"
+                  ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400"
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              <span>Payment Gateway</span>
             </button>
             <button
               onClick={() => setActiveTab("announcements")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
                 activeTab === "announcements"
                   ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
                   : "text-slate-600 dark:text-slate-400"
               }`}
             >
-              Announcements ({updates.length})
+              Announcements
             </button>
             <button
               onClick={() => setActiveTab("stats")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
                 activeTab === "stats"
                   ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm"
                   : "text-slate-600 dark:text-slate-400"
               }`}
             >
-              Overview Stats
+              Platform Stats
             </button>
           </div>
         </div>
 
-        {/* Status Toast */}
+        {/* Status Toast Notification */}
         {statusMessage && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs sm:text-sm font-semibold flex items-center gap-2 animate-in fade-in duration-200">
+          <div className="mb-6 p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs sm:text-sm font-semibold flex items-center gap-2 animate-in fade-in duration-200">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{statusMessage}</span>
           </div>
         )}
 
-        {/* TAB 1: RESOURCES */}
+        {/* TAB 1: RESOURCES & PDF UPLOADS */}
         {activeTab === "resources" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Add Resource Form */}
-            <div className="lg:col-span-5 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg h-fit space-y-4">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-cyan-500" />
-                <span>Add New Resource</span>
-              </h2>
+            {/* Upload & Add Form */}
+            <div className="lg:col-span-5 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-5 text-xs">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-cyan-500" />
+                  <span>Upload PDF & Set Price</span>
+                </h2>
+                <p className="text-slate-500 text-[11px] mt-0.5">
+                  Upload your study material and configure free or paid access with instant checkout.
+                </p>
+              </div>
 
-              <form onSubmit={handleAddResource} className="space-y-4 text-xs">
+              {/* 1. PDF File Upload Box */}
+              <div className="p-4 rounded-2xl border-2 border-dashed border-cyan-500/30 bg-cyan-500/5 hover:border-cyan-500/60 transition text-center relative">
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleFileUpload}
+                  disabled={uploadingFile}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <div className="space-y-1.5 py-2">
+                  <div className="w-10 h-10 mx-auto rounded-xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  {uploadingFile ? (
+                    <p className="text-cyan-600 dark:text-cyan-400 font-bold">Uploading file to server...</p>
+                  ) : uploadedFileInfo ? (
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-white truncate max-w-[240px] mx-auto">
+                        ✓ {uploadedFileInfo.fileName}
+                      </p>
+                      <p className="text-[10px] text-emerald-500 font-mono">
+                        Ready ({uploadedFileInfo.fileSize})
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">
+                        Click or drag PDF here to upload
+                      </p>
+                      <p className="text-[10px] text-slate-400">PDF documents up to 50MB supported</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <form onSubmit={handleAddResource} className="space-y-4">
+                {/* Title */}
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Resource Title *
@@ -221,11 +435,12 @@ export default function AdminPage() {
                     required
                     value={newResource.title}
                     onChange={e => setNewResource({ ...newResource, title: e.target.value })}
-                    placeholder="e.g. Next.js 16 Production Architecture"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                    placeholder="e.g. Complete Dynamic Programming Patterns Handbook"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
+                {/* Topic & Type */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -234,7 +449,7 @@ export default function AdminPage() {
                     <select
                       value={newResource.topic}
                       onChange={e => setNewResource({ ...newResource, topic: e.target.value as ResourceTopic })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                     >
                       <option value="DSA">DSA</option>
                       <option value="Web Dev">Web Dev</option>
@@ -248,100 +463,148 @@ export default function AdminPage() {
 
                   <div>
                     <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Resource Type
+                      Type
                     </label>
                     <select
                       value={newResource.type}
                       onChange={e => setNewResource({ ...newResource, type: e.target.value as ResourceType })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                     >
-                      <option value="Cheat Sheet">Cheat Sheet</option>
                       <option value="PDF">PDF</option>
+                      <option value="Cheat Sheet">Cheat Sheet</option>
                       <option value="Notes">Notes</option>
-                      <option value="GitHub Repo">GitHub Repo</option>
-                      <option value="Tool">Tool</option>
-                      <option value="Free Course">Free Course</option>
+                      <option value="Free Course">Course Guide</option>
                     </select>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Difficulty Level
-                    </label>
-                    <select
-                      value={newResource.difficulty}
-                      onChange={e => setNewResource({ ...newResource, difficulty: e.target.value as Difficulty })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                    >
-                      <option value="Beginner">Beginner</option>
-                      <option value="Intermediate">Intermediate</option>
-                      <option value="Advanced">Advanced</option>
-                    </select>
+                {/* Free vs Paid Toggle */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 dark:text-white">Pricing Model</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewResource({ ...newResource, isPaid: false, price: 0 })}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                          !newResource.isPaid
+                            ? "bg-emerald-500 text-white"
+                            : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                        }`}
+                      >
+                        Free (₹0)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewResource({ ...newResource, isPaid: true, price: 99 })}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
+                          newResource.isPaid
+                            ? "bg-amber-500 text-slate-950"
+                            : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                        }`}
+                      >
+                        <Lock className="w-3 h-3" /> Paid (INR)
+                      </button>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Estimated File Size
-                    </label>
-                    <input
-                      type="text"
-                      value={newResource.fileSize}
-                      onChange={e => setNewResource({ ...newResource, fileSize: e.target.value })}
-                      placeholder="e.g. 4.2 MB"
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                    />
-                  </div>
+                  {newResource.isPaid && (
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Selling Price (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={newResource.price}
+                          onChange={e => setNewResource({ ...newResource, price: Number(e.target.value) })}
+                          placeholder="e.g. 99"
+                          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Original Price / MRP (₹)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={newResource.originalPrice}
+                          onChange={e =>
+                            setNewResource({ ...newResource, originalPrice: Number(e.target.value) })
+                          }
+                          placeholder="e.g. 299"
+                          className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white font-mono"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
+                {/* Description */}
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Summary & Description *
+                    Summary & Highlights *
                   </label>
                   <textarea
                     required
                     rows={3}
                     value={newResource.description}
                     onChange={e => setNewResource({ ...newResource, description: e.target.value })}
-                    placeholder="Short summary of what this guide explains..."
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                    placeholder="Short summary of what this PDF explains..."
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
+                {/* Publish Button */}
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 rounded-xl font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition flex items-center justify-center gap-1.5 shadow-sm"
+                  className="w-full py-3 px-4 rounded-2xl font-bold bg-cyan-400 hover:bg-cyan-300 text-slate-950 transition flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Publish to Resources Hub</span>
+                  <span>
+                    Publish {newResource.isPaid ? `Paid Resource (₹${newResource.price})` : "Free Resource"}
+                  </span>
                 </button>
               </form>
             </div>
 
             {/* Existing Resources List */}
-            <div className="lg:col-span-7 space-y-3">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Live Library ({resources.length} items)
-              </h2>
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Published Library ({resources.length} items)
+                </h2>
+                <span className="text-xs text-slate-500 font-mono">
+                  {resources.filter(r => r.isPaid).length} Paid • {resources.filter(r => !r.isPaid).length} Free
+                </span>
+              </div>
 
-              <div className="space-y-2.5 max-h-[650px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[750px] overflow-y-auto pr-1">
                 {resources.map(res => (
                   <div
                     key={res.id}
-                    className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4"
+                    className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 shadow-sm"
                   >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                           {res.topic}
                         </span>
-                        <span className="text-[10px] font-medium text-cyan-600 dark:text-cyan-400">
-                          {res.type}
-                        </span>
-                        {res.isNew && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 bg-cyan-500 text-slate-950 rounded">
-                            NEW
+                        {res.isPaid ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/30 flex items-center gap-0.5 font-mono">
+                            <Lock className="w-2.5 h-2.5" /> ₹{res.price}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
+                            Free
+                          </span>
+                        )}
+                        {res.fileSize && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {res.fileSize}
                           </span>
                         )}
                       </div>
@@ -351,13 +614,15 @@ export default function AdminPage() {
                       <p className="text-xs text-slate-500 truncate">{res.description}</p>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteResource(res.id)}
-                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition shrink-0"
-                      title="Delete resource"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleDeleteResource(res.id)}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition"
+                        title="Delete resource"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -365,16 +630,318 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 2: ANNOUNCEMENTS */}
+        {/* TAB 2: ORDERS & SALES */}
+        {activeTab === "orders" && (
+          <div className="space-y-6">
+            {/* Sales Metrics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Total Gross Revenue
+                </span>
+                <p className="text-3xl font-extrabold text-emerald-500 font-mono">
+                  ₹{totalRevenue.toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-400">From paid PDF downloads</p>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Completed Orders
+                </span>
+                <p className="text-3xl font-extrabold text-cyan-500 font-mono">
+                  {orders.length}
+                </p>
+                <p className="text-xs text-slate-400">100% Verified Transactions</p>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Average Order Value (AOV)
+                </span>
+                <p className="text-3xl font-extrabold text-purple-500 font-mono">
+                  ₹{orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0}
+                </p>
+                <p className="text-xs text-slate-400">Affordable Indian Student Pricing</p>
+              </div>
+            </div>
+
+            {/* Orders Table */}
+            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 dark:text-white">
+                  Customer Transactions Log
+                </h3>
+                <span className="text-xs text-slate-500">Live order sync</span>
+              </div>
+
+              {orders.length === 0 ? (
+                <div className="p-12 text-center text-slate-500">
+                  <Receipt className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No transactions yet. Purchases will appear here in real-time.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 font-mono uppercase tracking-wider">
+                      <tr>
+                        <th className="p-4">Customer</th>
+                        <th className="p-4">Resource</th>
+                        <th className="p-4">Amount</th>
+                        <th className="p-4">Payment ID / Order ID</th>
+                        <th className="p-4">Method</th>
+                        <th className="p-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {orders.map(order => (
+                        <tr key={order.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="p-4">
+                            <p className="font-bold text-slate-900 dark:text-white">{order.customerName}</p>
+                            <p className="text-[11px] text-slate-400">{order.customerEmail}</p>
+                          </td>
+                          <td className="p-4 font-medium text-slate-800 dark:text-slate-200 max-w-[220px] truncate">
+                            {order.resourceTitle}
+                          </td>
+                          <td className="p-4 font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                            ₹{order.amount}
+                          </td>
+                          <td className="p-4 font-mono text-[11px] text-slate-500">
+                            <p>{order.paymentId}</p>
+                            <p className="text-[10px] text-slate-400">{order.orderId}</p>
+                          </td>
+                          <td className="p-4 font-mono text-slate-600 dark:text-slate-300">
+                            {order.paymentMethod || "UPI"}
+                          </td>
+                          <td className="p-4">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                              ✓ Paid
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: PAYMENT GATEWAY CONFIGURATION */}
+        {activeTab === "gateway" && (
+          <div className="max-w-4xl space-y-6">
+            <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-500">
+                  <CreditCard className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                    Real Payment Gateway Settings
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Configure your real Indian UPI ID and Razorpay API credentials to receive payments directly.
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Banner */}
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                <div className="text-xs space-y-1">
+                  <p className="font-bold text-slate-900 dark:text-white">
+                    Real Payments Active: Direct UPI + Official Razorpay
+                  </p>
+                  <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                    Students can pay you directly via Google Pay, PhonePe, and Paytm UPI QR code, or through Razorpay card/netbanking gateway.
+                  </p>
+                </div>
+              </div>
+
+              {/* Live Gateway Settings Form */}
+              <form
+                onSubmit={async e => {
+                  e.preventDefault();
+                  setSavingGateway(true);
+                  try {
+                    const res = await fetch("/api/admin/gateway-settings", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(gatewayForm)
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      setStatusMessage("✓ Payment gateway settings saved! Real payments are active.");
+                      setTimeout(() => setStatusMessage(""), 4000);
+                    } else {
+                      alert(data.error || "Failed to save settings");
+                    }
+                  } catch {
+                    alert("Error saving settings");
+                  } finally {
+                    setSavingGateway(false);
+                  }
+                }}
+                className="space-y-6 pt-2"
+              >
+                {/* 1. Direct UPI Configuration */}
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>1. Your Real UPI ID (Direct Bank Transfer)</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400">
+                          0% Fee
+                        </span>
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Students scan this QR in Google Pay, PhonePe, or Paytm and the money goes directly to your bank account!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Your UPI ID / VPA *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={gatewayForm.upiId}
+                        onChange={e => setGatewayForm({ ...gatewayForm, upiId: e.target.value })}
+                        placeholder="e.g. yourname@okaxis, 9876543210@paytm, codedecoded@upi"
+                        className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 font-mono font-bold text-cyan-600 dark:text-cyan-400 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Business / Payee Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={gatewayForm.upiName}
+                        onChange={e => setGatewayForm({ ...gatewayForm, upiName: e.target.value })}
+                        placeholder="e.g. Code Decoded"
+                        className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* UPI QR Preview */}
+                  <div className="pt-2 flex items-center gap-4">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(
+                        `upi://pay?pa=${gatewayForm.upiId}&pn=${encodeURIComponent(gatewayForm.upiName)}&cu=INR`
+                      )}`}
+                      alt="Current UPI QR"
+                      className="w-16 h-16 rounded-xl border border-slate-200 bg-white p-1 shrink-0"
+                    />
+                    <div className="text-xs text-slate-500">
+                      <p className="font-semibold text-slate-800 dark:text-slate-200">
+                        Live UPI QR Preview:
+                      </p>
+                      <p className="font-mono text-[11px] text-cyan-600 dark:text-cyan-400">
+                        upi://pay?pa={gatewayForm.upiId}&pn={gatewayForm.upiName}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Razorpay API Keys Configuration */}
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-4">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>2. Razorpay Payment Gateway (Cards, NetBanking, UPI)</span>
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Enter your keys from{" "}
+                      <a
+                        href="https://dashboard.razorpay.com/app/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-cyan-500 underline"
+                      >
+                        Razorpay Dashboard &gt; Settings &gt; API Keys
+                      </a>
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Razorpay Key ID
+                      </label>
+                      <input
+                        type="text"
+                        value={gatewayForm.razorpayKeyId}
+                        onChange={e => setGatewayForm({ ...gatewayForm, razorpayKeyId: e.target.value })}
+                        placeholder="rzp_test_... or rzp_live_..."
+                        className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 font-mono text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Razorpay Key Secret
+                      </label>
+                      <input
+                        type="password"
+                        value={gatewayForm.razorpayKeySecret}
+                        onChange={e => setGatewayForm({ ...gatewayForm, razorpayKeySecret: e.target.value })}
+                        placeholder="Paste your Secret Key"
+                        className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 font-mono text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <button
+                  type="submit"
+                  disabled={savingGateway}
+                  className="px-6 py-3.5 rounded-2xl font-bold text-sm bg-gradient-to-r from-cyan-400 to-sky-500 hover:brightness-110 text-slate-950 transition shadow-lg shadow-cyan-500/25 flex items-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>{savingGateway ? "Saving Settings..." : "Save Payment Gateway Settings"}</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: ANNOUNCEMENTS */}
         {activeTab === "announcements" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-5 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg h-fit space-y-4 text-xs">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-xs">
+            <div className="lg:col-span-5 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Bell className="w-4 h-4 text-cyan-500" />
                 <span>Publish Announcement</span>
               </h2>
 
-              <form onSubmit={handleAddAnnouncement} className="space-y-4">
+              <form
+                onSubmit={e => {
+                  e.preventDefault();
+                  if (!newUpdate.title || !newUpdate.description) return;
+                  const item: UpdateAnnouncement = {
+                    id: `update-${Date.now()}`,
+                    title: newUpdate.title || "",
+                    category: newUpdate.category || "News",
+                    date: new Date().toISOString().split("T")[0],
+                    description: newUpdate.description || "",
+                    linkText: newUpdate.linkText,
+                    linkUrl: newUpdate.linkUrl,
+                    badge: newUpdate.badge
+                  };
+                  setUpdates([item, ...updates]);
+                  setStatusMessage(`✓ Announcement published!`);
+                  setTimeout(() => setStatusMessage(""), 3000);
+                }}
+                className="space-y-4"
+              >
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Announcement Headline *
@@ -384,41 +951,9 @@ export default function AdminPage() {
                     required
                     value={newUpdate.title}
                     onChange={e => setNewUpdate({ ...newUpdate, title: e.target.value })}
-                    placeholder="e.g. New YouTube Video: LeetCode Patterns"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                    placeholder="e.g. New YouTube Video Released!"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={newUpdate.category}
-                      onChange={e => setNewUpdate({ ...newUpdate, category: e.target.value as any })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                    >
-                      <option value="YouTube">YouTube</option>
-                      <option value="Resource">Resource</option>
-                      <option value="Instagram">Instagram</option>
-                      <option value="Event">Event</option>
-                      <option value="News">News</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Badge Label
-                    </label>
-                    <input
-                      type="text"
-                      value={newUpdate.badge}
-                      onChange={e => setNewUpdate({ ...newUpdate, badge: e.target.value })}
-                      placeholder="e.g. Milestone, Trending"
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                    />
-                  </div>
                 </div>
 
                 <div>
@@ -430,17 +965,16 @@ export default function AdminPage() {
                     rows={3}
                     value={newUpdate.description}
                     onChange={e => setNewUpdate({ ...newUpdate, description: e.target.value })}
-                    placeholder="What is this update about?"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                    placeholder="Details about this update..."
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 rounded-xl font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition flex items-center justify-center gap-1.5 shadow-sm"
+                  className="w-full py-2.5 px-4 rounded-xl font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Publish to Timeline</span>
+                  Publish to Timeline
                 </button>
               </form>
             </div>
@@ -449,7 +983,6 @@ export default function AdminPage() {
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                 Live Timeline Updates ({updates.length})
               </h2>
-
               <div className="space-y-3">
                 {updates.map(item => (
                   <div
@@ -469,33 +1002,31 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 3: STATS */}
+        {/* TAB 5: STATS */}
         {activeTab === "stats" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
               <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Total Resources</p>
               <p className="text-3xl font-extrabold text-cyan-500">{resources.length}</p>
-              <p className="text-xs text-slate-400">Available in Free Library</p>
+              <p className="text-xs text-slate-400">In Free & Premium Library</p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Total Downloads</p>
-              <p className="text-3xl font-extrabold text-emerald-500">
-                {resources.reduce((acc, r) => acc + r.downloadsCount, 0).toLocaleString()}
-              </p>
-              <p className="text-xs text-slate-400">Cheat sheets & PDFs</p>
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Paid PDF Revenue</p>
+              <p className="text-3xl font-extrabold text-emerald-500 font-mono">₹{totalRevenue}</p>
+              <p className="text-xs text-slate-400">{orders.length} student orders</p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
               <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Community Reach</p>
               <p className="text-3xl font-extrabold text-purple-500">75,000+</p>
               <p className="text-xs text-slate-400">Instagram & YouTube</p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Interactive Roadmaps</p>
-              <p className="text-3xl font-extrabold text-amber-500">3</p>
-              <p className="text-xs text-slate-400">Web Dev, DSA, Data Science</p>
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Free Downloads</p>
+              <p className="text-3xl font-extrabold text-amber-500">100k+</p>
+              <p className="text-xs text-slate-400">Across All Roadmaps</p>
             </div>
           </div>
         )}

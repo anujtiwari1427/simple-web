@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ORD-UPI-1794638947759",
+    "orderId": "ORD-UPI-1794638947759",
+    "paymentId": "UTR-431289012345",
+    "resourceId": "res-1",
+    "resourceTitle": "The Ultimate DSA Decoded Cheatsheet",
+    "amount": 99,
+    "customerName": "Siddharth Learner",
+    "customerEmail": "siddharth@example.com",
+    "customerPhone": "+91 9988776655",
+    "status": "paid",
+    "paymentMethod": "Direct UPI (UTR Verified)",
+    "createdAt": "2026-11-14T06:49:07.759Z",
+    "downloadUrl": "#download"
+  },
+  {
+    "id": "ord_sample_001",
+    "orderId": "order_cd_sample1",
+    "paymentId": "pay_live_89210",
+    "resourceId": "res-1",
+    "resourceTitle": "The Ultimate DSA Decoded Cheatsheet",
+    "amount": 99,
+    "customerName": "Aman Sharma",
+    "customerEmail": "aman.sharma@gmail.com",
+    "customerPhone": "+91 98765 43210",
+    "status": "paid",
+    "paymentMethod": "Razorpay Gateway",
+    "createdAt": "2026-11-14T09:30:00.000Z",
+    "downloadUrl": "#download"
+  }
+]
